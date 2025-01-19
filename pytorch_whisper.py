@@ -50,8 +50,7 @@ def transcribe_audio(file_path, model_size="base"):
     processor = WhisperProcessor.from_pretrained(model_name)
     model = WhisperForConditionalGeneration.from_pretrained(
         model_name,
-        torch_dtype=torch.float16,
-        use_safetensors=True  # Use safetensors format instead of pickle
+        torch_dtype=torch.float16
     ).to(device)
     
     # Process the audio
