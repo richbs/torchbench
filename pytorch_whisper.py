@@ -1,7 +1,11 @@
+import warnings
 import torch
 import torchaudio
 from transformers import WhisperProcessor, WhisperForConditionalGeneration
 import numpy as np
+
+# Filter out specific warnings
+warnings.filterwarnings("ignore", message=".*resume_download.*")
 
 def load_audio(file_path, sample_rate=16000):
     """
