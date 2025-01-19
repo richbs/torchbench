@@ -12,7 +12,7 @@ def load_audio(file_path, sample_rate=16000):
     Load an audio file and resample it to 16kHz for Whisper.
     """
     waveform, original_sample_rate = torchaudio.load(file_path)
-    
+    print([waveform, original_sample_rate])
     # Convert stereo to mono by averaging channels if necessary
     if waveform.shape[0] > 1:
         waveform = torch.mean(waveform, dim=0, keepdim=True)
