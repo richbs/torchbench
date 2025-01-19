@@ -95,7 +95,7 @@ def transcribe_audio(file_path, model_size="base", chunk_length_s=30):
             print(f"Processing chunk {i} of {len(chunks)}...")
             
             # Create explicit attention mask for the input features
-            input_features = processor(
+            features = processor(
                 chunk.numpy(),
                 sampling_rate=16000,
                 return_tensors="pt",
@@ -103,15 +103,15 @@ def transcribe_audio(file_path, model_size="base", chunk_length_s=30):
             )
             
             # Move all tensors to device and convert to float16
-            input_features = {
+            features = {
                 k: v.to(device).to(torch.float16) if torch.is_tensor(v) else v
-                for k, v in input_features.items()
+                for k, v in features.items()
             }
             
             # Generate tokens with attention mask
             predicted_ids = model.generate(
-                input_features.input_features,
-                attention_mask=input_features.attention_mask,
+                features['input_features'],
+                attention_mask=features['attention_mask'],
                 do_sample=True,
                 max_new_tokens=400,
                 no_repeat_ngram_size=3,
@@ -162,4 +162,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
