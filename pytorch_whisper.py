@@ -48,7 +48,12 @@ def transcribe_audio(file_path, model_size="base"):
     model_name = f"openai/whisper-{model_size}"
     
     processor = WhisperProcessor.from_pretrained(model_name)
-    model = WhisperForConditionalGeneration.from_pretrained(model_name).to(device)
+    model = WhisperForConditionalGeneration.from_pretrained(
+        model_name,
+        torch_dtype=torch.float16,
+        device_map=device,
+        use_safetensors=True  # Use safetensors format instead of pickle
+    ).to(device)
     
     # Process the audio
     input_features = processor(
@@ -58,7 +63,10 @@ def transcribe_audio(file_path, model_size="base"):
     ).input_features.to(device)
     
     # Generate tokens
-    predicted_ids = model.generate(input_features)
+    predicted_ids = model.generate(
+        input_features,
+        max_new_tokens=448  # Explicitly set max_new_tokens instead of max_length
+    )
     
     # Decode the tokens to text
     transcription = processor.batch_decode(
