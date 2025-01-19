@@ -56,6 +56,7 @@ def transcribe_audio(file_path, model_size="base", chunk_length_s=30):
     
     # Load Whisper model and processor
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(device)
     model_name = f"openai/whisper-{model_size}"
     
     processor = WhisperProcessor.from_pretrained(model_name)
