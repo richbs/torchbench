@@ -58,7 +58,7 @@ def transcribe_audio(file_path, model_size="base"):
         waveform.squeeze().numpy(),
         sampling_rate=16000,
         return_tensors="pt"
-    ).input_features.to(device)
+    ).input_features.to(device).to(torch.float16)
     
     # Generate tokens
     predicted_ids = model.generate(
