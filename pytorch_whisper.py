@@ -78,7 +78,7 @@ def transcribe_audio(file_path, model_size="base", chunk_length_s=30):
             device = torch.device("mps") if torch.backends.mps.is_available() else "cpu"
         
         model_name = f"openai/whisper-{model_size}"
-        print(f"Using Whisper model: {model_name} with device {device}")
+        
         processor = WhisperProcessor.from_pretrained(model_name)
         forced_decoder_ids = processor.get_decoder_prompt_ids(language="en", task="transcribe")
         
@@ -94,16 +94,26 @@ def transcribe_audio(file_path, model_size="base", chunk_length_s=30):
         for i, chunk in enumerate(chunks, 1):
             print(f"Processing chunk {i} of {len(chunks)}...")
             
+            # Create explicit attention mask for the input features
             input_features = processor(
                 chunk.numpy(),
                 sampling_rate=16000,
-                return_tensors="pt"
-            ).input_features.to(device).to(torch.float16)
+                return_tensors="pt",
+                return_attention_mask=True  # Explicitly request attention mask
+            )
             
+            # Move all tensors to device and convert to float16
+            input_features = {
+                k: v.to(device).to(torch.float16) if torch.is_tensor(v) else v
+                for k, v in input_features.items()
+            }
+            
+            # Generate tokens with attention mask
             predicted_ids = model.generate(
-                input_features,
-                do_sample=True,  # Enable sampling
-                max_new_tokens=400,  # Reduced to allow room for special tokens
+                input_features.input_features,
+                attention_mask=input_features.attention_mask,
+                do_sample=True,
+                max_new_tokens=400,
                 no_repeat_ngram_size=3,
                 return_timestamps=False,
                 temperature=0.7,
@@ -152,3 +162,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
