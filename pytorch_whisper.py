@@ -76,9 +76,10 @@ def transcribe_audio(file_path, model_size="base", chunk_length_s=30):
         device = "cuda" if torch.cuda.is_available() else "cpu"
         if device == "cpu" and platform.system() == "Darwin" and platform.processor() == "arm":
             device = torch.device("mps") if torch.backends.mps.is_available() else "cpu"
-        
+        #device = "cpu"
         model_name = f"openai/whisper-{model_size}"
-        
+        print(f"Using Whisper model: {model_name} with device {device}")
+
         processor = WhisperProcessor.from_pretrained(model_name)
         forced_decoder_ids = processor.get_decoder_prompt_ids(language="en", task="transcribe")
         
