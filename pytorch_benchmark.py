@@ -10,7 +10,7 @@ def get_available_devices() -> List[str]:
         List[str]: List containing available devices ('cpu', 'cuda', 'mps').
         CUDA is available on NVIDIA GPUs, MPS on Apple Silicon.
     """
-    devices = []  # CPU is always available
+    devices = ['cpu']  # CPU is always available
     
     # Check for NVIDIA GPU support
     if torch.cuda.is_available():
@@ -46,7 +46,7 @@ def benchmark_matmul(size: Tuple[int, int], device: str, num_iterations: int = 1
         num_iterations (int): Number of iterations to average over
     
     Returns:
-        float: Average time per operation in seconds
+        float: Average time per operation in milliseconds
     """
     # Create input tensors on the specified device
     a, b = create_tensors(size, device)
@@ -78,7 +78,7 @@ def benchmark_matmul(size: Tuple[int, int], device: str, num_iterations: int = 1
     end_time = time.perf_counter()
     
     # Calculate average time per operation
-    return (end_time - start_time) / num_iterations
+    return (end_time - start_time) / num_iterations * 200
 
 def run_benchmarks():
     """Run benchmarks across all available devices.
@@ -95,38 +95,45 @@ def run_benchmarks():
     # Define matrix sizes to test
     # Larger sizes will show more pronounced differences between devices
     sizes = [
-        (20000, 20000),  # 1K x 1K elements
+        (1000, 1000),  # 1K x 1K elements
         (2000, 2000),  # 2K x 2K elements
         (4000, 4000),   # 4K x 4K elements
-        (5000, 5000)   # 4K x 4K elements
+        (5000, 5000)   # 5K x 5K elements
     ]
     
     # Print system information and available devices
     print(f"PyTorch version: {torch.__version__}")
     print(f"System: {platform.system()} {platform.machine()}\n")
     print("Available devices:", devices)
-    print("\nMatrix Multiplication Benchmark Results (seconds per operation):\n")
+    print("\nMatrix Multiplication Benchmark Results (milliseconds per operation):\n")
     
     # Create and print table header
-    header = "Size".ljust(15)
+    header = "Size".rjust(15)
     for device in devices:
-        header += f"{device.upper().ljust(15)}"
+        header += f"{device.upper().rjust(15)}"
+    header += f"Speed up".rjust(15)
     print(header)
-    print("-" * (15 + 15 * len(devices)))
+    print("-" * (15 + 15 * (len(devices) +1)))
     
     # Run benchmarks for each matrix size
     for size in sizes:
-        size_str = f"{size[0]}x{size[1]}".ljust(15)
-        
+        size_str = f"{size[0]}x{size[1]}".rjust(15)
+        last_time_taken = 0
+        time_taken = 0
         # Test each available device
         for device in devices:
             try:
+                last_time_taken = time_taken
                 time_taken = benchmark_matmul(size, device)
-                size_str += f"{time_taken:.6f}".ljust(15)
+                size_str += f"{time_taken:.2f}".rjust(15)
             except Exception as e:
                 # Handle any errors (out of memory, device not supported, etc.)
-                size_str += f"Error: {str(e)[:10]}".ljust(15)
-        
+                size_str += f"Error: {str(e)[:10]}".rjust(15)
+        # Check the speed-up ratio
+        ratio = last_time_taken / time_taken
+        size_str += f"{ratio:.2f}x".rjust(15)
+
+
         print(size_str)
 
 if __name__ == "__main__":
