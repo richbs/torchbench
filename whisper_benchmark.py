@@ -3,8 +3,9 @@ import warnings
 import torch
 import numpy as np
 import ffmpeg
-from transformers import WhisperProcessor, WhisperForConditionalGeneration
+import time
 import platform
+from transformers import WhisperProcessor, WhisperForConditionalGeneration
 
 # Filter out specific warnings
 warnings.filterwarnings("ignore", message=".*resume_download.*")
@@ -189,92 +190,62 @@ def benchmark_tokens_per_second(model_size="base", chunk_length_s=30, num_iterat
     except Exception as e:
         raise RuntimeError(f"Benchmark failed: {str(e)}")
 
-def transcribe_audio(file_path, model_size="base", chunk_length_s=30):
+def run_benchmark_suite():
     """
-    Transcribe audio file to text using OpenAI's Whisper model.
+    Run comprehensive tokens per second benchmarks across different model sizes.
     """
-    try:
-        print("Loading audio file...")
-        waveform = load_audio(file_path)
-        
-        print("Loading Whisper model...")
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        if device == "cpu" and platform.system() == "Darwin" and platform.processor() == "arm":
-            device = torch.device("mps") if torch.backends.mps.is_available() else "cpu"
-        #device = "cpu"
-        model_name = f"openai/whisper-{model_size}"
-        print(f"Using Whisper model: {model_name} with device {device}")
-
-        processor = WhisperProcessor.from_pretrained(model_name)
-        forced_decoder_ids = processor.get_decoder_prompt_ids(language="en", task="transcribe")
-        
-        model = WhisperForConditionalGeneration.from_pretrained(
-            model_name,
-            torch_dtype=torch.float16
-        ).to(device)
-        
-        print("Processing audio in chunks...")
-        chunks = chunk_audio(waveform, chunk_length_s=chunk_length_s)
-        
-        transcription = []
-        for i, chunk in enumerate(chunks, 1):
-            print(f"Processing chunk {i} of {len(chunks)}...")
-            
-            # Create explicit attention mask for the input features
-            features = processor(
-                chunk.numpy(),
-                sampling_rate=16000,
-                return_tensors="pt",
-                return_attention_mask=True  # Explicitly request attention mask
-            )
-            
-            # Move all tensors to device and convert to float16
-            features = {
-                k: v.to(device).to(torch.float16) if torch.is_tensor(v) else v
-                for k, v in features.items()
-            }
-            
-            # Generate tokens with attention mask
-            predicted_ids = model.generate(
-                features['input_features'],
-                attention_mask=features['attention_mask'],
-                do_sample=True,
-                max_new_tokens=400,
-                no_repeat_ngram_size=3,
-                return_timestamps=False,
-                temperature=0.7,
-                top_k=50,
-                top_p=0.95,
-                repetition_penalty=1.2,
-                forced_decoder_ids=forced_decoder_ids
-            )
-            
-            chunk_text = processor.batch_decode(
-                predicted_ids,
-                skip_special_tokens=True,
-                clean_up_tokenization_spaces=True
-            )[0].strip()
-            
-            transcription.append(chunk_text)
-        
-        return " ".join(transcription)
+    model_sizes = ["tiny", "base", "small"]
     
-    except Exception as e:
-        raise RuntimeError(f"Transcription failed: {str(e)}")
+    print("Whisper Model Benchmark Suite")
+    print("=" * 50)
+    print(f"PyTorch version: {torch.__version__}")
+    print(f"System: {platform.system()} {platform.machine()}")
+    
+    # Check available devices
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    if device == "cpu" and platform.system() == "Darwin" and platform.processor() == "arm":
+        device = torch.device("mps") if torch.backends.mps.is_available() else "cpu"
+    print(f"Using device: {device}\n")
+    
+    results = []
+    
+    for model_size in model_sizes:
+        try:
+            print(f"\n{'='*20} {model_size.upper()} MODEL {'='*20}")
+            result = benchmark_tokens_per_second(model_size=model_size, num_iterations=3)
+            results.append(result)
+            
+            print(f"\nResults for {model_size} model:")
+            print(f"  Tokens per second: {result['tokens_per_second']:.1f}")
+            print(f"  Avg processing time: {result['avg_processing_time']:.3f}s")
+            print(f"  Avg tokens generated: {result['avg_tokens_generated']:.0f}")
+            
+        except Exception as e:
+            print(f"Benchmark failed for {model_size} model: {str(e)}")
+            continue
+    
+    # Print summary table
+    if results:
+        print(f"\n{'='*60}")
+        print("BENCHMARK SUMMARY")
+        print(f"{'='*60}")
+        print(f"{'Model':<10} {'Tokens/sec':<12} {'Proc Time (s)':<14} {'Avg Tokens':<12}")
+        print("-" * 60)
+        
+        for result in results:
+            print(f"{result['model_size']:<10} "
+                  f"{result['tokens_per_second']:<12.1f} "
+                  f"{result['avg_processing_time']:<14.3f} "
+                  f"{result['avg_tokens_generated']:<12.0f}")
 
 def main():
     """
-    Example usage of the transcription function.
+    Run the benchmark suite.
     """
-    audio_path = "./holysonnet_01_donne.mp3"
     try:
-        print("\nStarting transcription process...")
-        transcription = transcribe_audio(audio_path, model_size="base", chunk_length_s=25)  # Reduced chunk size
-        print("\nTranscription completed successfully!")
-        print("\nTranscription:")
-        print(transcription)
+        run_benchmark_suite()
     except Exception as e:
-        print(f"Error during transcription: {str(e)}")
+        print(f"Error during benchmarking: {str(e)}")
         if "FFmpeg" in str(e):
             print("\nPlease ensure FFmpeg is installed:")
             if platform.system() == "Darwin":  # macOS
@@ -283,8 +254,6 @@ def main():
                 print("sudo apt-get install ffmpeg")
             else:  # Windows
                 print("Download FFmpeg from https://www.ffmpeg.org/download.html")
-        print("\nIf FFmpeg is installed and you're still seeing this error,")
-        print("try running 'which ffmpeg' to verify it's in your PATH")
 
 if __name__ == "__main__":
     main()

@@ -78,7 +78,7 @@ def benchmark_matmul(size: Tuple[int, int], device: str, num_iterations: int = 1
     end_time = time.perf_counter()
     
     # Calculate average time per operation
-    return (end_time - start_time) / num_iterations * 200
+    return (end_time - start_time) / num_iterations * 1000
 
 def run_benchmarks():
     """Run benchmarks across all available devices.
